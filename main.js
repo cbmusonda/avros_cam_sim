@@ -6,7 +6,7 @@ import { TransformControls } from './vendor/TransformControls.js';
 THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
 
 const D2R = Math.PI / 180;
-const STORE_KEY = 'avros-cam-sim-v1';
+const STORE_KEY = 'avros-cam-sim-v2';
 
 // ───────────────────────── URDF data (avros.urdf.xacro) ─────────────────────────
 const XS = 0.5556; // xsens_height
@@ -35,9 +35,9 @@ const COLORS = ['#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00acc1'
 function defaultCams() {
   const base = { roll: 0, range: 5, visible: true };
   return [
-    { id: 1, name: 'zed_front', color: COLORS[0], x: 0.6795, y: 0, z: XS - 0.108, yaw: 0, pitch: 15, lens: '4mm-calc', ...base, hfov: LENSES['4mm-calc'].h, vfov: LENSES['4mm-calc'].v },
-    { id: 2, name: 'zed_left', color: COLORS[1], x: 0.098, y: 0.286, z: XS + 0.057, yaw: 90, pitch: 0, lens: '2.2mm-calc', ...base, hfov: LENSES['2.2mm-calc'].h, vfov: LENSES['2.2mm-calc'].v },
-    { id: 3, name: 'zed_right', color: COLORS[2], x: 0.098, y: -0.286, z: XS + 0.057, yaw: -90, pitch: 0, lens: '2.2mm-calc', ...base, hfov: LENSES['2.2mm-calc'].h, vfov: LENSES['2.2mm-calc'].v },
+    { id: 1, name: 'zed_front', color: COLORS[0], x: 0.6795, y: 0, z: XS - 0.108, yaw: 0, pitch: 15, lens: '2.2mm-calc', ...base, hfov: LENSES['2.2mm-calc'].h, vfov: LENSES['2.2mm-calc'].v },
+    { id: 2, name: 'zed_left', color: COLORS[1], x: 0.098, y: 0.286, z: XS + 0.057, yaw: 90, pitch: 0, lens: '4mm-calc', ...base, hfov: LENSES['4mm-calc'].h, vfov: LENSES['4mm-calc'].v },
+    { id: 3, name: 'zed_right', color: COLORS[2], x: 0.098, y: -0.286, z: XS + 0.057, yaw: -90, pitch: 0, lens: '4mm-calc', ...base, hfov: LENSES['4mm-calc'].h, vfov: LENSES['4mm-calc'].v },
   ];
 }
 
