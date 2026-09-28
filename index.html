@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AVROS Camera Sim</title>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+<style>
+  :root {
+    --bg: #12161b; --panel: #1b2129; --line: #2c3540; --text: #dce3ea; --dim: #8a97a5; --accent: #4da3ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
+  #app { display: grid; grid-template-columns: 320px 1fr; height: 100%; }
+  #side { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 12px; }
+  #view { position: relative; min-width: 0; }
+  #view canvas { display: block; width: 100%; height: 100%; }
+  h1 { font-size: 15px; margin: 0 0 2px; }
+  .sub { color: var(--dim); font-size: 12px; margin-bottom: 12px; }
+  h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 16px 0 6px; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  button { background: #252e38; color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+    padding: 5px 9px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.on { background: var(--accent); color: #06121f; border-color: var(--accent); }
+  #camlist { display: flex; flex-direction: column; gap: 4px; }
+  .cam { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line);
+    border-radius: 6px; cursor: pointer; }
+  .cam.sel { border-color: var(--accent); background: #202a36; }
+  .cam .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .cam .nm { flex: 1; }
+  .cam input[type=checkbox] { margin: 0; }
+  .field { display: grid; grid-template-columns: 62px 1fr 68px; gap: 6px; align-items: center; margin: 3px 0; }
+  .field label { color: var(--dim); }
+  .field input[type=range] { width: 100%; accent-color: var(--accent); }
+  .field input[type=number], select, input[type=text] { width: 100%; background: #12181f; color: var(--text);
+    border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; font: inherit; }
+  .chk { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+  #info { background: #12181f; border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-family: ui-monospace, monospace;
+    font-size: 12px; white-space: pre-wrap; }
+  #out { width: 100%; height: 130px; background: #12181f; color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; font: 11px ui-monospace, monospace; padding: 6px; }
+  #toolbar { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  #toolbar button { background: rgba(27,33,41,.92); }
+  #hint { position: absolute; bottom: 10px; left: 10px; color: var(--dim); font-size: 12px; pointer-events: none;
+    background: rgba(18,22,27,.7); padding: 4px 8px; border-radius: 6px; }
+  #povFrame { position: absolute; border: 2px solid var(--accent); pointer-events: none; display: none; }
+  #povLabel { position: absolute; top: 4px; left: 6px; font-size: 11px; background: rgba(18,22,27,.8); padding: 1px 6px; border-radius: 4px; }
+  @media (max-width: 760px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: 46% 54%; }
+    #side { order: 2; border-right: 0; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <h1>AVROS Camera Sim</h1>
+    <div class="sub">ZED X placement &amp; FOV, dimensions from <code>avros.urdf.xacro</code>. Frame: x forward, y left, z up (metres, origin = base_link on ground).</div>
+
+    <h2>Cameras</h2>
+    <div id="camlist"></div>
+    <div class="row" style="margin-top:6px">
+      <button id="addCam">+ Add</button>
+      <button id="delCam">Delete</button>
+      <button id="dupCam">Mirror L/R</button>
+    </div>
+
+    <h2>Selected camera</h2>
+    <div class="field"><label>Name</label><input type="text" id="f-name"><span></span></div>
+    <div class="field"><label>Lens</label><select id="f-lens"></select><span></span></div>
+    <div id="fields"></div>
+    <div class="row" style="margin-top:6px">
+      <button id="modeT" class="on">Move (T)</button>
+      <button id="modeR">Rotate (R)</button>
+    </div>
+
+    <h2>Coverage</h2>
+    <div id="info"></div>
+
+    <h2>Scene</h2>
+    <label class="chk"><input type="checkbox" id="t-car" checked> Car body</label>
+    <label class="chk"><input type="checkbox" id="t-frustum" checked> FOV volumes</label>
+    <label class="chk"><input type="checkbox" id="t-foot" checked> Ground footprints</label>
+    <label class="chk"><input type="checkbox" id="t-fig"> Reference figures (1.7 m)</label>
+    <label class="chk"><input type="checkbox" id="t-lane"> Lane lines (3 m wide)</label>
+    <label class="chk"><input type="checkbox" id="t-pov" checked> Camera POV inset</label>
+
+    <h2>Save / export</h2>
+    <div class="row">
+      <button id="exp">Export JSON</button>
+      <button id="imp">Import JSON</button>
+      <button id="urdf">URDF origins</button>
+      <button id="reset">Reset to URDF</button>
+    </div>
+    <input type="file" id="file" accept=".json,application/json" hidden>
+    <textarea id="out" readonly placeholder="URDF joint origins appear here" style="margin-top:8px"></textarea>
+  </aside>
+
+  <main id="view">
+    <div id="toolbar">
+      <button data-view="persp">Perspective</button>
+      <button data-view="top">Top</button>
+      <button data-view="side">Side</button>
+      <button data-view="front">Front</button>
+      <button data-view="rear">Rear</button>
+    </div>
+    <div id="hint">Click a camera to select · drag the gizmo to move/rotate · T / R switch mode · right-drag pans</div>
+    <div id="povFrame"><span id="povLabel"></span></div>
+  </main>
+</div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
