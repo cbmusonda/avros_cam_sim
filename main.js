@@ -27,7 +27,7 @@ const LENSES = {
   '2.2mm-ds':   { label: '2.2 mm (datasheet ~110 x 80, verify)', h: 110, v: 80 },
   '4mm-calc':   { label: '4 mm (calculated, rectilinear)', ...rect(4) },
   '4mm-ds':     { label: '4 mm (datasheet ~80 x 55, verify)', h: 80, v: 55 },
-  custom:       { label: 'Custom (use sliders)' },
+  custom:       { label: 'Custom (imported values)' },
 };
 
 const COLORS = ['#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00acc1', '#fdd835'];
@@ -280,6 +280,12 @@ const inputs = {};
 for (const f of FIELDS) {
   const row = document.createElement('div');
   row.className = 'field';
+  if (f.fov) { // read-only: FOV comes from the lens preset
+    row.innerHTML = `<label>${f.label}</label><output style="font-weight:600"></output><span style="opacity:.6">${f.unit === '°' ? 'degrees' : f.unit}</span>`;
+    inputs[f.k] = { out: row.children[1] };
+    fieldsEl.appendChild(row);
+    continue;
+  }
   row.innerHTML = `<label>${f.label} <span style="opacity:.6">(${f.unit})</span></label><input type="range" min="${f.min}" max="${f.max}" step="${f.step}"><input type="number" step="${f.step}">`;
   const [, range, num] = row.children;
   const set = (val, typing) => {
@@ -287,8 +293,7 @@ for (const f of FIELDS) {
     if (!Number.isFinite(val)) return;
     const c = sel();
     c[f.k] = val;
-    if (f.fov) { c.lens = 'custom'; $('f-lens').value = 'custom'; }
-    refresh(c); syncFields(typing ? f.k : undefined); updateInfo(); save();
+        refresh(c); syncFields(typing ? f.k : undefined); updateInfo(); save();
   };
   range.addEventListener('input', () => set(range.value, false));
   num.addEventListener('change', () => set(num.value, true));
@@ -299,6 +304,7 @@ function syncFields(except) {
   const c = sel();
   for (const f of FIELDS) {
     const v = c[f.k];
+    if (f.fov) { inputs[f.k].out.textContent = v.toFixed(1); continue; }
     inputs[f.k].range.value = v;
     if (f.k !== except) inputs[f.k].num.value = Math.round(v * 1000) / 1000;
   }
