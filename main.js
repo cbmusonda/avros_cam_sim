@@ -280,18 +280,18 @@ const inputs = {};
 for (const f of FIELDS) {
   const row = document.createElement('div');
   row.className = 'field';
-  row.innerHTML = `<label>${f.label}</label><input type="range" min="${f.min}" max="${f.max}" step="${f.step}"><input type="number" step="${f.step}">`;
+  row.innerHTML = `<label>${f.label} <span style="opacity:.6">(${f.unit})</span></label><input type="range" min="${f.min}" max="${f.max}" step="${f.step}"><input type="number" step="${f.step}">`;
   const [, range, num] = row.children;
-  const set = (val) => {
+  const set = (val, typing) => {
     val = parseFloat(val);
     if (!Number.isFinite(val)) return;
     const c = sel();
     c[f.k] = val;
     if (f.fov) { c.lens = 'custom'; $('f-lens').value = 'custom'; }
-    refresh(c); syncFields(f.k); updateInfo(); save();
+    refresh(c); syncFields(typing ? f.k : undefined); updateInfo(); save();
   };
-  range.addEventListener('input', () => set(range.value));
-  num.addEventListener('change', () => set(num.value));
+  range.addEventListener('input', () => set(range.value, false));
+  num.addEventListener('change', () => set(num.value, true));
   inputs[f.k] = { range, num };
   fieldsEl.appendChild(row);
 }
