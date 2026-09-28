@@ -97,12 +97,14 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.1);
 sun.position.set(-4, -6, 10);
 scene.add(sun);
 
-// ground + grid (1 m cells)
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: 0x2b3a2f }));
-ground.position.z = -0.002;
+// ground: 20 ft x 20 ft (6.096 m) pad centred under the car, grid = 1 ft cells
+const PAD = 20 * 0.3048, PAD_CX = 0.3143;
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(PAD, PAD), new THREE.MeshStandardMaterial({ color: 0x2b3a2f }));
+ground.position.set(PAD_CX, 0, -0.002);
 scene.add(ground);
-const grid = new THREE.GridHelper(40, 40, 0x7a8b7f, 0x475549);
+const grid = new THREE.GridHelper(PAD, 20, 0x7a8b7f, 0x475549);
 grid.rotation.x = Math.PI / 2;
+grid.position.set(PAD_CX, 0, 0);
 scene.add(grid);
 const axes = new THREE.AxesHelper(0.6); // x red, y green, z blue == ROS convention
 axes.position.z = 0.003;
@@ -128,7 +130,7 @@ for (const b of CAR_BOXES) {
 
 // reference figures + lane lines
 const figGroup = new THREE.Group();
-for (const [x, y] of [[2, 0], [4, 0], [6, 0], [0.1, 1.5], [0.1, -1.5], [0.1, 3], [0.1, -3]]) {
+for (const [x, y] of [[1.5, 0], [2.5, 0], [3.2, 0], [0.1, 1.5], [0.1, -1.5], [0.1, 3], [0.1, -3]]) {
   const p = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.7, 16), new THREE.MeshStandardMaterial({ color: 0xd9a066 }));
   p.rotation.x = Math.PI / 2;
   p.position.set(x, y, 0.85);
@@ -137,8 +139,8 @@ for (const [x, y] of [[2, 0], [4, 0], [6, 0], [0.1, 1.5], [0.1, -1.5], [0.1, 3],
 scene.add(figGroup);
 const laneGroup = new THREE.Group();
 for (const y of [-1.5, 1.5]) {
-  const l = new THREE.Mesh(new THREE.PlaneGeometry(14, 0.1), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-  l.position.set(5, y, 0.002);
+  const l = new THREE.Mesh(new THREE.PlaneGeometry(PAD, 0.1), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  l.position.set(PAD_CX, y, 0.002);
   laneGroup.add(l);
 }
 scene.add(laneGroup);
