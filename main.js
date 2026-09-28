@@ -6,7 +6,7 @@ import { TransformControls } from './vendor/TransformControls.js';
 THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
 
 const D2R = Math.PI / 180;
-const STORE_KEY = 'avros-cam-sim-v2';
+const STORE_KEY = 'avros-cam-sim-v3';
 
 // ───────────────────────── URDF data (avros.urdf.xacro) ─────────────────────────
 const XS = 0.5556; // xsens_height
@@ -19,15 +19,16 @@ const CAR_BOXES = [
 ];
 const VELODYNE = { c: [0.089, 0, XS + 0.159], r: 0.052, len: 0.072 };
 
-// ZED X sensor: AR0234, 1920x1200 @ 3 um => 5.76 x 3.6 mm
-const SENSOR = { w: 5.76, h: 3.6 };
-const rect = (f) => ({ h: 2 * Math.atan(SENSOR.w / 2 / f) / D2R, v: 2 * Math.atan(SENSOR.h / 2 / f) / D2R });
+// Fixed ZED X lens FOV from the Stereolabs datasheet (max H x V x D, degrees).
+// FOV is not user-editable: pick the lens, then move the camera.
 const LENSES = {
-  '2.2mm-calc': { label: '2.2 mm (calculated, rectilinear)', ...rect(2.2) },
-  '2.2mm-ds':   { label: '2.2 mm (datasheet ~110 x 80, verify)', h: 110, v: 80 },
-  '4mm-calc':   { label: '4 mm (calculated, rectilinear)', ...rect(4) },
-  '4mm-ds':     { label: '4 mm (datasheet ~80 x 55, verify)', h: 80, v: 55 },
-  custom:       { label: 'Custom (imported values)' },
+  '2.2mm': { label: 'ZED X 2.2 mm (110° × 80°)', h: 110, v: 80, d: 120 },
+  '4mm':   { label: 'ZED X 4 mm (75° × 50°)', h: 75, v: 50, d: 83 },
+};
+const lockFov = (c) => { // force datasheet FOV for the camera's lens
+  if (!LENSES[c.lens]) c.lens = '4mm';
+  c.hfov = LENSES[c.lens].h; c.vfov = LENSES[c.lens].v;
+  return c;
 };
 
 const COLORS = ['#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00acc1', '#fdd835'];
@@ -35,10 +36,10 @@ const COLORS = ['#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00acc1'
 function defaultCams() {
   const base = { roll: 0, range: 5, visible: true };
   return [
-    { id: 1, name: 'zed_front', color: COLORS[0], x: 0.6795, y: 0, z: XS - 0.108, yaw: 0, pitch: 15, lens: '2.2mm-calc', ...base, hfov: LENSES['2.2mm-calc'].h, vfov: LENSES['2.2mm-calc'].v },
-    { id: 2, name: 'zed_left', color: COLORS[1], x: 0.098, y: 0.286, z: XS + 0.057, yaw: 90, pitch: 0, lens: '4mm-calc', ...base, hfov: LENSES['4mm-calc'].h, vfov: LENSES['4mm-calc'].v },
-    { id: 3, name: 'zed_right', color: COLORS[2], x: 0.098, y: -0.286, z: XS + 0.057, yaw: -90, pitch: 0, lens: '4mm-calc', ...base, hfov: LENSES['4mm-calc'].h, vfov: LENSES['4mm-calc'].v },
-  ];
+    { id: 1, name: 'zed_front', color: COLORS[0], x: 0.6795, y: 0, z: XS - 0.108, yaw: 0, pitch: 15, lens: '2.2mm', ...base, hfov: 0, vfov: 0 },
+    { id: 2, name: 'zed_left', color: COLORS[1], x: 0.098, y: 0.286, z: XS + 0.057, yaw: 90, pitch: 0, lens: '4mm', ...base, hfov: 0, vfov: 0 },
+    { id: 3, name: 'zed_right', color: COLORS[2], x: 0.098, y: -0.286, z: XS + 0.057, yaw: -90, pitch: 0, lens: '4mm', ...base, hfov: 0, vfov: 0 },
+  ].map(lockFov);
 }
 
 const FIELDS = [
@@ -67,7 +68,7 @@ function load() {
     const raw = localStorage.getItem(STORE_KEY);
     if (!raw) return;
     const d = JSON.parse(raw);
-    if (Array.isArray(d.cams) && d.cams.length) { cams = d.cams; selectedId = d.selectedId; nextId = d.nextId || cams.length + 1; }
+    if (Array.isArray(d.cams) && d.cams.length) { cams = d.cams.map(lockFov); selectedId = d.selectedId; nextId = d.nextId || cams.length + 1; }
     if (d.flags) Object.assign(flags, d.flags);
   } catch (e) { /* ignore */ }
 }
@@ -312,12 +313,7 @@ function syncFields(except) {
 
 const lensSel = $('f-lens');
 for (const [k, l] of Object.entries(LENSES)) lensSel.add(new Option(l.label, k));
-lensSel.addEventListener('change', () => {
-  const c = sel();
-  c.lens = lensSel.value;
-  if (LENSES[c.lens].h) { c.hfov = LENSES[c.lens].h; c.vfov = LENSES[c.lens].v; }
-  refresh(c); syncFields(); updateInfo(); save();
-});
+lensSel.disabled = true; // lens/FOV is fixed per camera
 $('f-name').addEventListener('input', (e) => { sel().name = e.target.value; renderList(); save(); });
 
 function renderList() {
@@ -339,7 +335,7 @@ function select(id) {
   selectedId = id;
   renderList();
   $('f-name').value = sel().name;
-  lensSel.value = sel().lens in LENSES ? sel().lens : 'custom';
+  lensSel.value = sel().lens;
   syncFields();
   attachGizmo();
   updateInfo();
@@ -360,11 +356,10 @@ function updateInfo() {
   };
   const near = rayHit(c.vfov / 2);
   const far = rayHit(-c.vfov / 2);
-  const f = (SENSOR.w / 2) / Math.tan(c.hfov * D2R / 2);
   const fmt = (q) => (q ? `(${q.x.toFixed(2)}, ${q.y.toFixed(2)}) m` : 'none');
   $('info').textContent =
     `${c.name}\n` +
-    `FOV ${c.hfov.toFixed(1)}° × ${c.vfov.toFixed(1)}°  (≈ ${f.toFixed(2)} mm rectilinear)\n` +
+    `Lens ${c.lens}: FOV ${c.hfov}° H × ${c.vfov}° V × ${LENSES[c.lens].d}° D (datasheet)\n` +
     `Mount height ${c.z.toFixed(3)} m\n` +
     `Lower edge hits ground: ${fmt(near)}\n` +
     (near ? `  ${Math.hypot(near.x - p.x, near.y - p.y).toFixed(2)} m from camera\n` : '') +
@@ -373,12 +368,14 @@ function updateInfo() {
   povLabel();
 }
 
-$('addCam').addEventListener('click', () => {
-  const c = { id: nextId++, name: `cam_${nextId - 1}`, color: COLORS[(nextId - 2) % COLORS.length], x: 0.3, y: 0, z: 0.75, yaw: 0, pitch: 10, roll: 0, range: 5, visible: true, lens: '4mm-calc', hfov: LENSES['4mm-calc'].h, vfov: LENSES['4mm-calc'].v };
+const addCam = (lens) => {
+  const c = lockFov({ id: nextId++, name: `cam_${nextId - 1}`, color: COLORS[(nextId - 2) % COLORS.length], x: 0.3, y: 0, z: 0.75, yaw: 0, pitch: 10, roll: 0, range: 5, visible: true, lens });
   cams.push(c);
   refresh(c);
   select(c.id);
-});
+};
+$('addCam22').addEventListener('click', () => addCam('2.2mm'));
+$('addCam4').addEventListener('click', () => addCam('4mm'));
 $('delCam').addEventListener('click', () => {
   if (cams.length <= 1) return;
   const o = objs.get(selectedId);
@@ -447,7 +444,7 @@ $('file').addEventListener('change', async (e) => {
   try {
     const d = JSON.parse(await e.target.files[0].text());
     if (!Array.isArray(d.cameras) || !d.cameras.length) throw new Error('no cameras');
-    cams = d.cameras.map((c, i) => ({ roll: 0, range: 5, visible: true, lens: 'custom', color: COLORS[i % COLORS.length], ...c, id: i + 1 }));
+    cams = d.cameras.map((c, i) => lockFov({ roll: 0, range: 5, visible: true, lens: '4mm', color: COLORS[i % COLORS.length], ...c, id: i + 1 }));
     nextId = cams.length + 1;
     rebuildAll();
     select(cams[0].id);
