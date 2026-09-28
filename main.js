@@ -88,7 +88,7 @@ camera.layers.enable(1); // layer 1 = editor overlays (frustums, camera bodies, 
 camera.position.set(-3, -3.6, 2.6);
 
 const orbit = new OrbitControls(camera, renderer.domElement);
-orbit.target.set(1, 0, 0.4);
+orbit.target.set(0.2747, 0, 0.4);
 orbit.enableDamping = true;
 orbit.update();
 
@@ -98,7 +98,7 @@ sun.position.set(-4, -6, 10);
 scene.add(sun);
 
 // ground: 20 ft x 20 ft (6.096 m) pad centred under the car, grid = 1 ft cells
-const PAD = 20 * 0.3048, PAD_CX = 0.3143;
+const PAD = 20 * 0.3048, PAD_CX = (-0.1778 + 0.7271) / 2; // centre of the car's full x-extent (platform back .. tread front), y is symmetric
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(PAD, PAD), new THREE.MeshStandardMaterial({ color: 0x2b3a2f }));
 ground.position.set(PAD_CX, 0, -0.002);
 scene.add(ground);
@@ -422,9 +422,9 @@ for (const k of Object.keys(flags)) {
 
 // camera presets
 const VIEWS = {
-  persp: [[-3, -3.6, 2.6], [1, 0, 0.4]],
-  top: [[0.99, 0, 9], [1, 0, 0]],
-  side: [[0.3, -6, 0.9], [0.3, 0, 0.5]],
+  persp: [[-2.7, -3.6, 2.6], [0.2747, 0, 0.4]],
+  top: [[0.2647, 0, 9], [0.2747, 0, 0]],
+  side: [[0.2747, -6, 0.9], [0.2747, 0, 0.5]],
   front: [[7, 0.001, 0.9], [0, 0, 0.5]],
   rear: [[-7, 0.001, 0.9], [0, 0, 0.5]],
 };
