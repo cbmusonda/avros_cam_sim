@@ -18,6 +18,10 @@ const CAR_BOXES = [
   { name: 'IMU',             c: [0, 0, XS],                s: [0.06, 0.06, 0.03],       color: 0x2255cc },
 ];
 const VELODYNE = { c: [0.089, 0, XS + 0.159], r: 0.052, len: 0.072 };
+// VLP-16: 16 rings, -15..+15 deg in 2 deg steps, 360 deg azimuth. Range/min-range are display settings.
+const LIDAR_ELEV = Array.from({ length: 16 }, (_, i) => -15 + 2 * i);
+const LIDAR_RANGE = 30, LIDAR_MIN = 0.4;
+const FIGS = [[1.5, 0], [2.5, 0], [3.2, 0], [0.1, 1.5], [0.1, -1.5], [0.1, 3], [0.1, -3]]; // reference figures (x, y)
 
 // ZED X sensor: AR0234, 1920x1200 @ 3 um => 5.76 x 3.6 mm
 const SENSOR = { w: 5.76, h: 3.6 };
@@ -57,10 +61,13 @@ const FIELDS = [
 let cams = defaultCams();
 let selectedId = 1;
 let nextId = 4;
-const flags = { car: true, frustum: true, foot: true, fig: false, lane: false, pov: true };
+const flags = { car: true, frustum: true, foot: true, fig: false, lane: false, pov: true, lidar: true, lidarBeams: true };
+const lidarDefault = () => ({ x: VELODYNE.c[0], y: VELODYNE.c[1], z: VELODYNE.c[2] });
+const lidar = lidarDefault();
+let selKind = 'cam'; // 'cam' | 'lidar': what the gizmo is attached to
 
 function save() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ cams, selectedId, nextId, flags })); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ cams, selectedId, nextId, flags, lidar })); } catch (e) { /* ignore */ }
 }
 function load() {
   try {
@@ -69,6 +76,7 @@ function load() {
     const d = JSON.parse(raw);
     if (Array.isArray(d.cams) && d.cams.length) { cams = d.cams; selectedId = d.selectedId; nextId = d.nextId || cams.length + 1; }
     if (d.flags) Object.assign(flags, d.flags);
+    if (d.lidar) Object.assign(lidar, d.lidar);
   } catch (e) { /* ignore */ }
 }
 load();
@@ -121,16 +129,9 @@ for (const b of CAR_BOXES) {
   m.add(e);
   carGroup.add(m);
 }
-{
-  const v = new THREE.Mesh(new THREE.CylinderGeometry(VELODYNE.r, VELODYNE.r, VELODYNE.len, 24), new THREE.MeshStandardMaterial({ color: 0x222222 }));
-  v.rotation.x = Math.PI / 2;
-  v.position.set(...VELODYNE.c);
-  carGroup.add(v);
-}
-
 // reference figures + lane lines
 const figGroup = new THREE.Group();
-for (const [x, y] of [[1.5, 0], [2.5, 0], [3.2, 0], [0.1, 1.5], [0.1, -1.5], [0.1, 3], [0.1, -3]]) {
+for (const [x, y] of FIGS) {
   const p = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.7, 16), new THREE.MeshStandardMaterial({ color: 0xd9a066 }));
   p.rotation.x = Math.PI / 2;
   p.position.set(x, y, 0.85);
@@ -144,6 +145,104 @@ for (const y of [-1.5, 1.5]) {
   laneGroup.add(l);
 }
 scene.add(laneGroup);
+
+
+// ───────────────────────── lidar (VLP-16) ─────────────────────────
+const lidarGroup = new THREE.Group();
+{
+  const v = new THREE.Mesh(new THREE.CylinderGeometry(VELODYNE.r, VELODYNE.r, VELODYNE.len, 24), new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xff8800, emissiveIntensity: 0.15 }));
+  v.rotation.x = Math.PI / 2;
+  v.layers.enable(1); // pickable, still visible in camera POVs
+  v.userData.lidar = true;
+  lidarGroup.add(v);
+  scene.add(lidarGroup);
+}
+const lidarRings = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ vertexColors: true }));
+const lidarBeams = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffb04d, transparent: true, opacity: 0.3 }));
+const lidarHits = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ size: 0.05, vertexColors: true }));
+for (const m of [lidarRings, lidarBeams, lidarHits]) { m.layers.set(1); m.frustumCulled = false; scene.add(m); }
+
+const OCCLUDERS = CAR_BOXES.map((b) => ({ min: b.c.map((c, i) => c - b.s[i] / 2), max: b.c.map((c, i) => c + b.s[i] / 2) }));
+
+// nearest hit along a ray from o (dir d): ground, car body, or a reference figure; null = nothing within range
+function traceRay(o, d) {
+  let t = Infinity, type = null;
+  if (d[2] < -1e-9) { t = -o[2] / d[2]; type = 'ground'; }
+  for (const b of OCCLUDERS) {
+    let t0 = -Infinity, t1 = Infinity;
+    for (let i = 0; i < 3; i++) {
+      if (Math.abs(d[i]) < 1e-12) { if (o[i] < b.min[i] || o[i] > b.max[i]) { t0 = Infinity; break; } continue; }
+      const a = (b.min[i] - o[i]) / d[i], c = (b.max[i] - o[i]) / d[i];
+      t0 = Math.max(t0, Math.min(a, c)); t1 = Math.min(t1, Math.max(a, c));
+    }
+    if (t0 <= t1 && t0 >= LIDAR_MIN && t0 < t) { t = t0; type = 'car'; }
+  }
+  if (flags.fig) {
+    for (const [fx, fy] of FIGS) {
+      const px = o[0] - fx, py = o[1] - fy, a = d[0] * d[0] + d[1] * d[1];
+      if (a < 1e-12) continue;
+      const bq = px * d[0] + py * d[1], disc = bq * bq - a * (px * px + py * py - 0.22 * 0.22);
+      if (disc < 0) continue;
+      const tc = (-bq - Math.sqrt(disc)) / a, z = o[2] + d[2] * tc;
+      if (tc >= LIDAR_MIN && tc < t && z >= 0 && z <= 1.7) { t = tc; type = 'fig'; }
+    }
+  }
+  return t >= LIDAR_MIN && t <= LIDAR_RANGE ? { t, type } : null;
+}
+
+function updateLidar() {
+  lidarGroup.position.set(lidar.x, lidar.y, lidar.z);
+  lidarRings.visible = lidarHits.visible = flags.lidar;
+  lidarBeams.visible = flags.lidar && flags.lidarBeams;
+  const o = [lidar.x, lidar.y, lidar.z];
+  const ringPos = [], ringCol = [], beamPos = [], hitPos = [], hitCol = [];
+  const lines = [];
+  const col = new THREE.Color();
+  LIDAR_ELEV.forEach((el, ri) => {
+    const ce = Math.cos(el * D2R), se = Math.sin(el * D2R);
+    col.setHSL(0.02 + (ri / 15) * 0.6, 1, 0.55);
+    let prev = null, first = null, blocked = 0, ground = 0;
+    for (let j = 0; j <= 360; j++) {
+      const a = (j % 360) * D2R;
+      const d = [ce * Math.cos(a), ce * Math.sin(a), se];
+      const h = traceRay(o, d);
+      const p = h ? [o[0] + d[0] * h.t, o[1] + d[1] * h.t, o[2] + d[2] * h.t] : null;
+      const g = h && h.type === 'ground' ? [p[0], p[1], 0.006] : null;
+      if (j < 360) {
+        if (h && h.type === 'car') blocked++;
+        if (g) ground++;
+        if (h && h.type !== 'ground') hitPos.push(...p), hitCol.push(...(h.type === 'car' ? [1, 0.25, 0.25] : [1, 0.9, 0.2]));
+        if (j % 45 === 0) beamPos.push(...o, ...(p || [o[0] + d[0] * LIDAR_RANGE, o[1] + d[1] * LIDAR_RANGE, o[2] + d[2] * LIDAR_RANGE]));
+      }
+      if (g && prev) ringPos.push(...prev, ...g), ringCol.push(col.r, col.g, col.b, col.r, col.g, col.b);
+      prev = g;
+    }
+    lines.push({ el, r: el < 0 ? lidar.z / Math.tan(-el * D2R) : null, blocked, ground });
+  });
+  const setGeo = (m, pos, colors) => {
+    m.geometry.dispose();
+    m.geometry = new THREE.BufferGeometry();
+    m.geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    if (colors) m.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  };
+  setGeo(lidarRings, ringPos, ringCol);
+  setGeo(lidarBeams, beamPos);
+  setGeo(lidarHits, hitPos, hitCol);
+
+  const down = lines.filter((l) => l.r !== null);
+  let txt = `Position (${lidar.x.toFixed(3)}, ${lidar.y.toFixed(3)}, ${lidar.z.toFixed(3)}) m, level\n` +
+    `Range ${LIDAR_RANGE} m (min ${LIDAR_MIN} m)\n` +
+    `Blind radius (steepest beam, -15°): ${down[0].r.toFixed(2)} m\n\n` +
+    `ring  elev   ground r   gap    car-blocked\n`;
+  down.forEach((l, i) => {
+    const gap = i ? (l.r - down[i - 1].r) : null;
+    txt += `${String(LIDAR_ELEV.indexOf(l.el)).padStart(3)}  ${String(l.el).padStart(4)}°  ${(l.r > LIDAR_RANGE ? '>' + LIDAR_RANGE : l.r.toFixed(2)).padStart(7)} m  ${gap === null || l.r > LIDAR_RANGE ? '   -  ' : gap.toFixed(2).padStart(5) + 'm'}  ${Math.round(l.blocked / 3.6)}%\n`;
+  });
+  const up = lines.filter((l) => l.r === null);
+  txt += `${up.length} rings above horizon (${up.map((l) => l.el + '°').join(', ')}): ` +
+    `${Math.round(up.reduce((s, l) => s + l.blocked, 0) / (up.length * 3.6))}% blocked by car`;
+  $('lidarInfo').textContent = txt;
+}
 
 // ───────────────────────── camera objects ─────────────────────────
 const objs = new Map(); // id -> { group, body, fr, edges, footMesh, footLine }
@@ -240,6 +339,12 @@ transform.setSize(0.6);
 scene.add(transform);
 transform.addEventListener('dragging-changed', (e) => { orbit.enabled = !e.value; });
 transform.addEventListener('objectChange', () => {
+  if (selKind === 'lidar') {
+    const p = lidarGroup.position;
+    lidar.x = p.x; lidar.y = p.y; lidar.z = p.z;
+    updateLidar(); syncLidarFields();
+    return;
+  }
   const c = sel();
   const g = objs.get(c.id).group;
   c.x = g.position.x; c.y = g.position.y; c.z = g.position.z;
@@ -251,10 +356,12 @@ transform.addEventListener('objectChange', () => {
 transform.addEventListener('mouseUp', save);
 
 function attachGizmo() {
+  if (selKind === 'lidar') { transform.attach(lidarGroup); return; }
   const o = objs.get(sel().id);
   if (o) transform.attach(o.group);
 }
 function setMode(m) {
+  if (selKind === 'lidar') m = 'translate'; // lidar is position-only for now
   transform.setMode(m);
   transform.setSpace(m === 'rotate' ? 'local' : 'world');
   document.getElementById('modeT').classList.toggle('on', m === 'translate');
@@ -271,8 +378,10 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4 || transform.dragging) return;
   const r = renderer.domElement.getBoundingClientRect();
   ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  const lh = ray.intersectObject(lidarGroup, true)[0];
   const hit = ray.intersectObjects([...objs.values()].filter((o) => o.group.visible).map((o) => o.body), false)[0];
-  if (hit) select(hit.object.userData.camId);
+  if (hit && (!lh || hit.distance < lh.distance)) select(hit.object.userData.camId);
+  else if (lh) selectLidar();
 });
 
 // ───────────────────────── UI ─────────────────────────
@@ -327,7 +436,7 @@ function renderList() {
   el.innerHTML = '';
   for (const c of cams) {
     const d = document.createElement('div');
-    d.className = 'cam' + (c.id === selectedId ? ' sel' : '');
+    d.className = 'cam' + (selKind === 'cam' && c.id === selectedId ? ' sel' : '');
     d.innerHTML = `<span class="dot" style="background:${c.color}"></span><span class="nm"></span><input type="checkbox" title="visible" ${c.visible ? 'checked' : ''}>`;
     d.querySelector('.nm').textContent = c.name;
     d.addEventListener('click', () => select(c.id));
@@ -338,6 +447,8 @@ function renderList() {
 }
 
 function select(id) {
+  selKind = 'cam';
+  $('lidarSel').classList.remove('sel');
   selectedId = id;
   renderList();
   $('f-name').value = sel().name;
@@ -347,6 +458,45 @@ function select(id) {
   updateInfo();
   save();
 }
+
+// lidar fields (x/y/z only)
+const LIDAR_FIELDS = [
+  { k: 'x', label: 'X fwd', min: -1, max: 1.5 },
+  { k: 'y', label: 'Y left', min: -0.8, max: 0.8 },
+  { k: 'z', label: 'Z up', min: 0, max: 1.3 },
+];
+const lidarInputs = {};
+for (const f of LIDAR_FIELDS) {
+  const row = document.createElement('div');
+  row.className = 'field';
+  row.innerHTML = `<label>${f.label} <span style="opacity:.6">(m)</span></label><input type="range" min="${f.min}" max="${f.max}" step="0.005"><input type="number" step="0.005">`;
+  const [, range, num] = row.children;
+  const set = (val) => {
+    val = parseFloat(val);
+    if (!Number.isFinite(val)) return;
+    lidar[f.k] = val;
+    updateLidar(); syncLidarFields(); save();
+  };
+  range.addEventListener('input', () => set(range.value));
+  num.addEventListener('change', () => set(num.value));
+  lidarInputs[f.k] = { range, num };
+  $('lidarFields').appendChild(row);
+}
+function syncLidarFields() {
+  for (const f of LIDAR_FIELDS) {
+    lidarInputs[f.k].range.value = lidar[f.k];
+    lidarInputs[f.k].num.value = Math.round(lidar[f.k] * 1000) / 1000;
+  }
+}
+function selectLidar() {
+  selKind = 'lidar';
+  $('lidarSel').classList.add('sel');
+  renderList();
+  setMode('translate');
+  attachGizmo();
+}
+$('lidarSel').addEventListener('click', selectLidar);
+$('lidarReset').addEventListener('click', () => { Object.assign(lidar, lidarDefault()); updateLidar(); syncLidarFields(); save(); });
 
 // ground coverage of the selected camera (unclipped by "range")
 function updateInfo() {
@@ -399,11 +549,11 @@ $('dupCam').addEventListener('click', () => {
 });
 
 $('modeT').addEventListener('click', () => setMode('translate'));
-$('modeR').addEventListener('click', () => setMode('rotate'));
+$('modeR').addEventListener('click', () => { if (selKind === 'cam') setMode('rotate'); });
 addEventListener('keydown', (e) => {
   if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
   if (e.key === 't' || e.key === 'T') setMode('translate');
-  if (e.key === 'r' || e.key === 'R') setMode('rotate');
+  if ((e.key === 'r' || e.key === 'R') && selKind === 'cam') setMode('rotate');
 });
 
 // scene toggles
@@ -412,6 +562,7 @@ const applyFlags = () => {
   figGroup.visible = flags.fig;
   laneGroup.visible = flags.lane;
   for (const c of cams) refresh(c);
+  updateLidar();
   $('povFrame').style.display = flags.pov ? 'block' : 'none';
 };
 for (const k of Object.keys(flags)) {
@@ -443,7 +594,7 @@ function download(name, text) {
   a.click();
   URL.revokeObjectURL(a.href);
 }
-$('exp').addEventListener('click', () => download('avros-cameras.json', JSON.stringify({ format: 'avros-cam-sim', version: 1, cameras: cams }, null, 2)));
+$('exp').addEventListener('click', () => download('avros-cameras.json', JSON.stringify({ format: 'avros-cam-sim', version: 1, cameras: cams, lidar }, null, 2)));
 $('imp').addEventListener('click', () => $('file').click());
 $('file').addEventListener('change', async (e) => {
   try {
@@ -451,6 +602,8 @@ $('file').addEventListener('change', async (e) => {
     if (!Array.isArray(d.cameras) || !d.cameras.length) throw new Error('no cameras');
     cams = d.cameras.map((c, i) => ({ roll: 0, range: 5, visible: true, lens: 'custom', color: COLORS[i % COLORS.length], ...c, id: i + 1 }));
     nextId = cams.length + 1;
+    if (d.lidar) Object.assign(lidar, d.lidar);
+    updateLidar(); syncLidarFields();
     rebuildAll();
     select(cams[0].id);
   } catch (err) { alert('Could not import: ' + err.message); }
@@ -461,13 +614,16 @@ $('urdf').addEventListener('click', () => {
   const text = cams.map((c) =>
     `<!-- ${c.name}: FOV ${c.hfov.toFixed(1)} x ${c.vfov.toFixed(1)} deg -->\n` +
     `<origin xyz="${r(c.x)} ${r(c.y)} \${xsens_height ${c.z - XS >= 0 ? '+' : '-'} ${r(Math.abs(c.z - XS))}}" rpy="${r(c.roll * D2R)} ${r(c.pitch * D2R)} ${r(c.yaw * D2R)}"/>\n` +
-    `<!-- absolute z above ground: ${r(c.z)} m -->`).join('\n\n');
+    `<!-- absolute z above ground: ${r(c.z)} m -->`).join('\n\n') +
+    `\n\n<!-- velodyne (VLP-16) -->\n<origin xyz="${r(lidar.x)} ${r(lidar.y)} \${xsens_height ${lidar.z - XS >= 0 ? '+' : '-'} ${r(Math.abs(lidar.z - XS))}}" rpy="0 0 0"/>\n` +
+    `<!-- absolute z above ground: ${r(lidar.z)} m -->`;
   $('out').value = text;
   navigator.clipboard?.writeText(text).catch(() => {});
 });
 $('reset').addEventListener('click', () => {
-  if (!confirm('Reset all cameras to the URDF positions?')) return;
+  if (!confirm('Reset all cameras and the lidar to the URDF positions?')) return;
   cams = defaultCams(); nextId = 4;
+  Object.assign(lidar, lidarDefault()); updateLidar(); syncLidarFields();
   rebuildAll();
   select(1);
 });
@@ -533,6 +689,7 @@ function loop() {
 // ───────────────────────── boot ─────────────────────────
 for (const c of cams) refresh(c);
 applyFlags();
+syncLidarFields();
 renderList();
 select(sel().id);
 resize();
