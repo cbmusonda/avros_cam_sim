@@ -17,10 +17,15 @@ const CAR_BOXES = [
   { name: 'right tread',     c: [0.3143, -0.3653, XS - 0.4763], s: [0.8255, 0.0889, 0.1397], color: 0x404040 },
   { name: 'IMU',             c: [0, 0, XS],                s: [0.06, 0.06, 0.03],       color: 0x2255cc },
 ];
-const VELODYNE = { c: [0.089, 0, XS + 0.159], r: 0.052, len: 0.072 };
-// VLP-16: 16 rings, -15..+15 deg in 2 deg steps, 360 deg azimuth. Range/min-range are display settings.
-const LIDAR_ELEV = Array.from({ length: 16 }, (_, i) => -15 + 2 * i);
-const LIDAR_RANGE = 30, LIDAR_MIN = 0.4;
+// Ouster OS1-64 Rev7. Mount position = lidar optical centre (os_lidar frame), kept at the old VLP-16 mount.
+// Body: ~87 mm dia x ~74 mm tall; optical centre ~36.18 mm above the base (os_sensor frame). Verify vs. your unit's metadata.
+const OUSTER = { c: [0.089, 0, XS + 0.159], r: 0.0435, len: 0.074, opticalZ: 0.03618 };
+// 64 channels, uniform spacing over 42.4 deg vertical FOV (+21.2..-21.2), 360 deg azimuth.
+// Ring 0 = top beam (Ouster convention). Range is a display cut-off (sensor reaches ~100 m @ 10%); min range 0.5 m.
+const LIDAR_CH = 64, LIDAR_VFOV = 42.4;
+const LIDAR_ELEV = Array.from({ length: LIDAR_CH }, (_, i) => LIDAR_VFOV / 2 - (LIDAR_VFOV * i) / (LIDAR_CH - 1));
+const LIDAR_RANGE = 30, LIDAR_MIN = 0.5;
+const LIDAR_BEAM_STEP = 4; // draw every 4th channel's beam lines (plus the bottom one) to keep it readable
 const FIGS = [[1.5, 0], [2.5, 0], [3.2, 0], [0.1, 1.5], [0.1, -1.5], [0.1, 3], [0.1, -3]]; // reference figures (x, y)
 
 // ZED X sensor: AR0234, 1920x1200 @ 3 um => 5.76 x 3.6 mm
@@ -62,8 +67,8 @@ let cams = defaultCams();
 let selectedId = 1;
 let nextId = 4;
 const flags = { car: true, frustum: true, foot: true, fig: false, lane: false, pov: true, lidar: true, lidarBeams: true };
-const lidarDefault = () => ({ x: VELODYNE.c[0], y: VELODYNE.c[1], z: VELODYNE.c[2] });
-const lidar = lidarDefault();
+const lidarDefault = () => ({ x: OUSTER.c[0], y: OUSTER.c[1], z: OUSTER.c[2] });
+const lidar = { ...lidarDefault(), visible: true };
 let selKind = 'cam'; // 'cam' | 'lidar': what the gizmo is attached to
 
 function save() {
@@ -147,14 +152,21 @@ for (const y of [-1.5, 1.5]) {
 scene.add(laneGroup);
 
 
-// ───────────────────────── lidar (VLP-16) ─────────────────────────
-const lidarGroup = new THREE.Group();
+// ───────────────────────── lidar (Ouster OS1-64) ─────────────────────────
+const lidarGroup = new THREE.Group(); // origin = optical centre
 {
-  const v = new THREE.Mesh(new THREE.CylinderGeometry(VELODYNE.r, VELODYNE.r, VELODYNE.len, 24), new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xff8800, emissiveIntensity: 0.15 }));
+  const zc = OUSTER.len / 2 - OUSTER.opticalZ; // body centre relative to optical centre
+  const v = new THREE.Mesh(new THREE.CylinderGeometry(OUSTER.r, OUSTER.r, OUSTER.len, 32), new THREE.MeshStandardMaterial({ color: 0x2a2a2a, emissive: 0xff8800, emissiveIntensity: 0.15 }));
   v.rotation.x = Math.PI / 2;
-  v.layers.enable(1); // pickable, still visible in camera POVs
-  v.userData.lidar = true;
-  lidarGroup.add(v);
+  v.position.z = zc;
+  // darker window band around the optical centre (OS1 aperture is ~20 mm tall)
+  const win = new THREE.Mesh(new THREE.CylinderGeometry(OUSTER.r + 0.0008, OUSTER.r + 0.0008, 0.02, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.2 }));
+  win.rotation.x = Math.PI / 2;
+  for (const m of [v, win]) {
+    m.layers.enable(1); // pickable, still visible in camera POVs
+    m.userData.lidar = true;
+    lidarGroup.add(m);
+  }
   scene.add(lidarGroup);
 }
 const lidarRings = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ vertexColors: true }));
@@ -192,15 +204,18 @@ function traceRay(o, d) {
 
 function updateLidar() {
   lidarGroup.position.set(lidar.x, lidar.y, lidar.z);
-  lidarRings.visible = lidarHits.visible = flags.lidar;
-  lidarBeams.visible = flags.lidar && flags.lidarBeams;
+  lidarGroup.visible = lidar.visible;
+  lidarRings.visible = lidarHits.visible = lidar.visible && flags.lidar;
+  lidarBeams.visible = lidar.visible && flags.lidar && flags.lidarBeams;
+  $('lidarVis').checked = lidar.visible;
+  if (!lidar.visible) { $('lidarInfo').textContent = 'Lidar hidden (tick the box above to show it).'; return; }
   const o = [lidar.x, lidar.y, lidar.z];
   const ringPos = [], ringCol = [], beamPos = [], hitPos = [], hitCol = [];
   const lines = [];
   const col = new THREE.Color();
   LIDAR_ELEV.forEach((el, ri) => {
     const ce = Math.cos(el * D2R), se = Math.sin(el * D2R);
-    col.setHSL(0.02 + (ri / 15) * 0.6, 1, 0.55);
+    col.setHSL(0.02 + (ri / (LIDAR_CH - 1)) * 0.6, 1, 0.55);
     let prev = null, first = null, blocked = 0, ground = 0;
     for (let j = 0; j <= 360; j++) {
       const a = (j % 360) * D2R;
@@ -212,7 +227,7 @@ function updateLidar() {
         if (h && h.type === 'car') blocked++;
         if (g) ground++;
         if (h && h.type !== 'ground') hitPos.push(...p), hitCol.push(...(h.type === 'car' ? [1, 0.25, 0.25] : [1, 0.9, 0.2]));
-        if (j % 45 === 0) beamPos.push(...o, ...(p || [o[0] + d[0] * LIDAR_RANGE, o[1] + d[1] * LIDAR_RANGE, o[2] + d[2] * LIDAR_RANGE]));
+        if (j % 45 === 0 && (ri % LIDAR_BEAM_STEP === 0 || ri === LIDAR_CH - 1)) beamPos.push(...o, ...(p || [o[0] + d[0] * LIDAR_RANGE, o[1] + d[1] * LIDAR_RANGE, o[2] + d[2] * LIDAR_RANGE]));
       }
       if (g && prev) ringPos.push(...prev, ...g), ringCol.push(col.r, col.g, col.b, col.r, col.g, col.b);
       prev = g;
@@ -229,17 +244,18 @@ function updateLidar() {
   setGeo(lidarBeams, beamPos);
   setGeo(lidarHits, hitPos, hitCol);
 
-  const down = lines.filter((l) => l.r !== null);
-  let txt = `Position (${lidar.x.toFixed(3)}, ${lidar.y.toFixed(3)}, ${lidar.z.toFixed(3)}) m, level\n` +
-    `Range ${LIDAR_RANGE} m (min ${LIDAR_MIN} m)\n` +
-    `Blind radius (steepest beam, -15°): ${down[0].r.toFixed(2)} m\n\n` +
+  const down = lines.filter((l) => l.r !== null).sort((a, b) => a.r - b.r);
+  let txt = `Optical centre (${lidar.x.toFixed(3)}, ${lidar.y.toFixed(3)}, ${lidar.z.toFixed(3)}) m, level\n` +
+    `${LIDAR_CH} ch, ${LIDAR_VFOV}° VFOV (${(LIDAR_VFOV / (LIDAR_CH - 1)).toFixed(3)}° spacing)\n` +
+    `Range shown ${LIDAR_RANGE} m (min ${LIDAR_MIN} m)\n` +
+    `Blind radius (steepest beam, ${down[0].el.toFixed(1)}°): ${down[0].r.toFixed(2)} m\n\n` +
     `ring  elev   ground r   gap    car-blocked\n`;
   down.forEach((l, i) => {
     const gap = i ? (l.r - down[i - 1].r) : null;
-    txt += `${String(LIDAR_ELEV.indexOf(l.el)).padStart(3)}  ${String(l.el).padStart(4)}°  ${(l.r > LIDAR_RANGE ? '>' + LIDAR_RANGE : l.r.toFixed(2)).padStart(7)} m  ${gap === null || l.r > LIDAR_RANGE ? '   -  ' : gap.toFixed(2).padStart(5) + 'm'}  ${Math.round(l.blocked / 3.6)}%\n`;
+    txt += `${String(LIDAR_ELEV.indexOf(l.el)).padStart(3)}  ${l.el.toFixed(1).padStart(5)}°  ${(l.r > LIDAR_RANGE ? '>' + LIDAR_RANGE : l.r.toFixed(2)).padStart(7)} m  ${gap === null || l.r > LIDAR_RANGE ? '   -  ' : gap.toFixed(2).padStart(5) + 'm'}  ${Math.round(l.blocked / 3.6)}%\n`;
   });
   const up = lines.filter((l) => l.r === null);
-  txt += `${up.length} rings above horizon (${up.map((l) => l.el + '°').join(', ')}): ` +
+  txt += `${up.length} rings above horizon (${up[up.length - 1].el.toFixed(1)}° to ${up[0].el.toFixed(1)}°): ` +
     `${Math.round(up.reduce((s, l) => s + l.blocked, 0) / (up.length * 3.6))}% blocked by car`;
   $('lidarInfo').textContent = txt;
 }
@@ -356,7 +372,7 @@ transform.addEventListener('objectChange', () => {
 transform.addEventListener('mouseUp', save);
 
 function attachGizmo() {
-  if (selKind === 'lidar') { transform.attach(lidarGroup); return; }
+  if (selKind === 'lidar') { if (lidar.visible) transform.attach(lidarGroup); else transform.detach(); return; }
   const o = objs.get(sel().id);
   if (o) transform.attach(o.group);
 }
@@ -378,7 +394,7 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4 || transform.dragging) return;
   const r = renderer.domElement.getBoundingClientRect();
   ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
-  const lh = ray.intersectObject(lidarGroup, true)[0];
+  const lh = lidar.visible ? ray.intersectObject(lidarGroup, true)[0] : null;
   const hit = ray.intersectObjects([...objs.values()].filter((o) => o.group.visible).map((o) => o.body), false)[0];
   if (hit && (!lh || hit.distance < lh.distance)) select(hit.object.userData.camId);
   else if (lh) selectLidar();
@@ -496,6 +512,8 @@ function selectLidar() {
   attachGizmo();
 }
 $('lidarSel').addEventListener('click', selectLidar);
+$('lidarVis').addEventListener('click', (e) => e.stopPropagation());
+$('lidarVis').addEventListener('change', (e) => { lidar.visible = e.target.checked; updateLidar(); if (selKind === 'lidar') attachGizmo(); save(); });
 $('lidarReset').addEventListener('click', () => { Object.assign(lidar, lidarDefault()); updateLidar(); syncLidarFields(); save(); });
 
 // ground coverage of the selected camera (unclipped by "range")
@@ -611,12 +629,13 @@ $('file').addEventListener('change', async (e) => {
 });
 $('urdf').addEventListener('click', () => {
   const r = (n) => Math.round(n * 1e4) / 1e4;
+  const zs = lidar.z - OUSTER.opticalZ;
   const text = cams.map((c) =>
     `<!-- ${c.name}: FOV ${c.hfov.toFixed(1)} x ${c.vfov.toFixed(1)} deg -->\n` +
     `<origin xyz="${r(c.x)} ${r(c.y)} \${xsens_height ${c.z - XS >= 0 ? '+' : '-'} ${r(Math.abs(c.z - XS))}}" rpy="${r(c.roll * D2R)} ${r(c.pitch * D2R)} ${r(c.yaw * D2R)}"/>\n` +
     `<!-- absolute z above ground: ${r(c.z)} m -->`).join('\n\n') +
-    `\n\n<!-- velodyne (VLP-16) -->\n<origin xyz="${r(lidar.x)} ${r(lidar.y)} \${xsens_height ${lidar.z - XS >= 0 ? '+' : '-'} ${r(Math.abs(lidar.z - XS))}}" rpy="0 0 0"/>\n` +
-    `<!-- absolute z above ground: ${r(lidar.z)} m -->`;
+    `\n\n<!-- ouster OS1-64: os_sensor (base of the sensor) -->\n<origin xyz="${r(lidar.x)} ${r(lidar.y)} \${xsens_height ${zs - XS >= 0 ? '+' : '-'} ${r(Math.abs(zs - XS))}}" rpy="0 0 0"/>\n` +
+    `<!-- absolute z above ground: base ${r(zs)} m, optical centre (os_lidar) ${r(lidar.z)} m -->`;
   $('out').value = text;
   navigator.clipboard?.writeText(text).catch(() => {});
 });

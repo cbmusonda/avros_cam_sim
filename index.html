@@ -78,8 +78,8 @@
       <button id="modeR">Rotate (R)</button>
     </div>
 
-    <h2>Lidar (VLP-16)</h2>
-    <div id="lidarSel" class="cam"><span class="dot" style="background:#ff8800"></span><span class="nm">velodyne</span></div>
+    <h2>Lidar (Ouster OS1-64)</h2>
+    <div id="lidarSel" class="cam"><span class="dot" style="background:#ff8800"></span><span class="nm">ouster</span><input type="checkbox" id="lidarVis" title="visible" checked></div>
     <div id="lidarFields" style="margin-top:4px"></div>
     <div class="row" style="margin-top:6px"><button id="lidarReset">Reset to URDF</button></div>
     <div id="lidarInfo" style="background:#12181f;border:1px solid var(--line);border-radius:6px;padding:8px;font:11px ui-monospace,monospace;white-space:pre;overflow-x:auto;margin-top:6px"></div>
@@ -92,7 +92,7 @@
     <label class="chk"><input type="checkbox" id="t-frustum" checked> FOV volumes</label>
     <label class="chk"><input type="checkbox" id="t-foot" checked> Ground footprints</label>
     <label class="chk"><input type="checkbox" id="t-lidar" checked> Lidar ground rings &amp; hits</label>
-    <label class="chk"><input type="checkbox" id="t-lidarBeams" checked> Lidar beams (every 45°)</label>
+    <label class="chk"><input type="checkbox" id="t-lidarBeams" checked> Lidar beams (every 45°, every 4th ch)</label>
     <label class="chk"><input type="checkbox" id="t-fig"> Reference figures (1.7 m)</label>
     <label class="chk"><input type="checkbox" id="t-lane"> Lane lines (3 m wide)</label>
     <label class="chk"><input type="checkbox" id="t-pov" checked> Camera POV inset</label>
