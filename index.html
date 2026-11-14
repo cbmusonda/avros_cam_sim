@@ -97,6 +97,11 @@
     <label class="chk"><input type="checkbox" id="t-lane"> Lane lines (3 m wide)</label>
     <label class="chk"><input type="checkbox" id="t-pov" checked> Camera POV inset</label>
 
+    <h2>Presets</h2>
+    <div class="row">
+      <button id="crown" title="4 cameras on a crown at 1.5 m above the lidar (see analysis/README.md)">360° crown (recommended)</button>
+    </div>
+
     <h2>Save / export</h2>
     <div class="row">
       <button id="exp">Export JSON</button>
@@ -120,6 +125,6 @@
     <div id="povFrame"><span id="povLabel"></span></div>
   </main>
 </div>
-<script type="module" src="./main.js"></script>
+<script type="module" src="./main.js?v=3"></script><!-- bump ?v= on each release to defeat browser/CDN caching -->
 </body>
 </html>

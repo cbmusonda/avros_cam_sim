@@ -1,0 +1,12 @@
+hybrid H=1.15 score  28.08 v=[33.926, 36.319, 34.222, 79.284, 0.123, 0.544]
+   ground  mono% [ 49.4 100.0  97.5  92.7]  stereo% [ 48.2 100.0  96.5  91.8]  overlap% [  1.8   6.5   1.3   0.3]  gap-close mono 5.98 m, stereo 5.98 m
+   z=0.5   mono% [ 86.5  91.0  88.8  58.9]  stereo% [ 40.4  89.3  86.8  58.0]  overlap% [  0.0   0.0   0.0   0.0]  gap-close mono 4.99 m, stereo 4.99 m
+   seam overlap @2.5m (F-L, L-Rear, Rear-R, R-F) [0.5, 0.0, 0.0, 0.5] deg, uncovered 9.0 deg
+hybrid H=1.30 score  31.19 v=[12.604, 38.636, 35.654, 83.213, 0.3, 0.597]
+   ground  mono% [ 19.0 100.0  99.3  95.2]  stereo% [ 17.3 100.0  98.8  94.6]  overlap% [  0.0  11.5   2.5   0.6]  gap-close mono 5.98 m, stereo 5.98 m
+   z=0.5   mono% [ 88.5  97.1  94.0  67.8]  stereo% [ 63.5  93.4  91.9  66.6]  overlap% [  5.8   2.0   0.0   0.0]  gap-close mono 4.99 m, stereo 4.99 m
+   seam overlap @2.5m (F-L, L-Rear, Rear-R, R-F) [1.5, 2.0, 2.0, 1.5] deg, uncovered 0.0 deg
+hybrid H=1.45 score  39.72 v=[19.142, 38.252, 37.061, 81.691, 0.288, 0.513]
+   ground  mono% [ 27.4  99.7  99.6  95.2]  stereo% [ 25.0  99.7  99.2  94.5]  overlap% [  0.0  13.7   4.5   1.4]  gap-close mono 5.98 m, stereo 5.98 m
+   z=0.5   mono% [ 78.8  98.8  95.2  72.3]  stereo% [ 67.3  96.7  93.4  71.4]  overlap% [  5.8   4.1   0.0   0.0]  gap-close mono 4.99 m, stereo 4.99 m
+   seam overlap @2.5m (F-L, L-Rear, Rear-R, R-F) [4.0, 4.0, 4.0, 4.0] deg, uncovered 0.0 deg

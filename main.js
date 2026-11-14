@@ -50,6 +50,22 @@ function defaultCams() {
   ];
 }
 
+// Recommended 360° layout (see analysis/README.md): all four ZED X on a crown directly above the lidar,
+// optical centres 12 cm from the mast axis at 1.50 m. Full stereo ground ring from ~0.6 m to ~4.25 m off the body,
+// 15-25° seam overlap at 2 m, crown sits above the Ouster's top beam (only the mast pole shadows the lidar).
+function crownCams() {
+  const base = { roll: 0, range: 5, visible: true };
+  const l22 = { lens: '2.2mm-calc', hfov: LENSES['2.2mm-calc'].h, vfov: LENSES['2.2mm-calc'].v };
+  const l4 = { lens: '4mm-calc', hfov: LENSES['4mm-calc'].h, vfov: LENSES['4mm-calc'].v };
+  const H = 1.5, XM = OUSTER.c[0], RC = 0.12;
+  return [
+    { id: 1, name: 'zed_front', color: COLORS[0], x: XM + RC, y: 0, z: H, yaw: 0, pitch: 30, ...l22, ...base },
+    { id: 2, name: 'zed_left', color: COLORS[1], x: XM, y: RC, z: H, yaw: 90, pitch: 37, ...l4, ...base },
+    { id: 3, name: 'zed_right', color: COLORS[2], x: XM, y: -RC, z: H, yaw: -90, pitch: 37, ...l4, ...base },
+    { id: 4, name: 'zed_rear', color: COLORS[3], x: XM - RC, y: 0, z: H, yaw: 180, pitch: 37, ...l22, ...base },
+  ];
+}
+
 const FIELDS = [
   { k: 'x', label: 'X fwd', min: -1, max: 1.5, step: 0.005, unit: 'm' },
   { k: 'y', label: 'Y left', min: -0.8, max: 0.8, step: 0.005, unit: 'm' },
@@ -638,6 +654,12 @@ $('urdf').addEventListener('click', () => {
     `<!-- absolute z above ground: base ${r(zs)} m, optical centre (os_lidar) ${r(lidar.z)} m -->`;
   $('out').value = text;
   navigator.clipboard?.writeText(text).catch(() => {});
+});
+$('crown').addEventListener('click', () => {
+  if (!confirm('Replace the cameras with the recommended 360° crown layout (4 cameras at 1.5 m above the lidar)?')) return;
+  cams = crownCams(); nextId = 5;
+  rebuildAll();
+  select(1);
 });
 $('reset').addEventListener('click', () => {
   if (!confirm('Reset all cameras and the lidar to the URDF positions?')) return;

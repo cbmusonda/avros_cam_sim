@@ -1,0 +1,20 @@
+crown H=1.00 score  34.96 v=[33.043, 34.758, 31.127, 89.319, 0.079]
+   ground  mono% [ 22.6 100.0 100.0  96.1]  stereo% [ 20.8 100.0  99.6  95.0]  overlap% [  1.8  14.2   3.0   0.0]  gap-close mono 5.98 m, stereo 5.98 m
+   z=0.5   mono% [100.0  97.5  93.6  72.2]  stereo% [ 65.4  95.9  90.7  71.4]  overlap% [  7.7   0.8   0.0   0.0]  gap-close mono 4.99 m, stereo 4.99 m
+   seam overlap @2.5m (F-L, L-Rear, Rear-R, R-F) [2.5, 2.5, 2.5, 2.5] deg, uncovered 0.0 deg
+crown H=1.15 score  44.43 v=[33.75, 36.77, 29.727, 89.55, 0.126]
+   ground  mono% [ 35.7 100.0 100.0  97.5]  stereo% [ 32.7 100.0 100.0  96.4]  overlap% [  0.0  18.0   5.7   0.1]  gap-close mono 5.98 m, stereo 5.98 m
+   z=0.5   mono% [100.0 100.0  96.1  93.1]  stereo% [ 69.2  99.2  94.6  91.6]  overlap% [ 15.4   3.7   0.0   0.0]  gap-close mono 4.96 m, stereo 4.96 m
+   seam overlap @2.5m (F-L, L-Rear, Rear-R, R-F) [5.0, 5.0, 5.0, 5.0] deg, uncovered 0.0 deg
+crown H=1.30 score  45.51 v=[33.712, 38.717, 33.062, 90.2, 0.109]
+   ground  mono% [ 42.9 100.0 100.0  98.1]  stereo% [ 40.5 100.0 100.0  97.3]  overlap% [  0.0  24.9   8.8   0.5]  gap-close mono 5.98 m, stereo 5.98 m
+   z=0.5   mono% [ 88.5 100.0  98.5  92.7]  stereo% [ 88.5 100.0  96.4  91.3]  overlap% [ 11.5   9.0   0.4   0.0]  gap-close mono 4.99 m, stereo 4.99 m
+   seam overlap @2.5m (F-L, L-Rear, Rear-R, R-F) [7.5, 9.5, 9.5, 7.5] deg, uncovered 0.0 deg
+crown H=1.45 score  46.59 v=[31.747, 37.774, 35.987, 90.744, 0.253]
+   ground  mono% [ 48.2 100.0 100.0  98.9]  stereo% [ 47.0 100.0 100.0  98.2]  overlap% [  0.0  26.4  11.5   1.0]  gap-close mono 5.96 m, stereo 5.96 m
+   z=0.5   mono% [ 84.6 100.0  99.7  84.1]  stereo% [ 84.6 100.0  99.1  83.1]  overlap% [ 11.5  13.5   1.8   0.0]  gap-close mono 4.99 m, stereo 4.99 m
+   seam overlap @2.5m (F-L, L-Rear, Rear-R, R-F) [9.5, 12.0, 12.0, 9.5] deg, uncovered 0.0 deg
+crown H=1.60 score  47.96 v=[27.888, 23.387, 27.906, 90.048, 0.278]
+   ground  mono% [  7.7  82.6 100.0 100.0]  stereo% [  7.7  82.6 100.0  99.9]  overlap% [  0.0   8.0  11.3   2.5]  gap-close mono 0.99 m, stereo 5.93 m
+   z=0.5   mono% [ 44.2 100.0 100.0  98.9]  stereo% [ 44.2 100.0 100.0  97.9]  overlap% [  0.0  11.5   4.0   0.1]  gap-close mono 4.84 m, stereo 4.84 m
+   seam overlap @2.5m (F-L, L-Rear, Rear-R, R-F) [11.0, 10.0, 10.0, 11.0] deg, uncovered 0.0 deg

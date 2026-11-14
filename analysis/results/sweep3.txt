@@ -1,0 +1,5 @@
+H=1.15 S=3.554 v=[30.58, 38.98, 31.72, 89.68, 0.1] stereo full ring (0.5, 3.1) seams@2m(F-L,L-Re,Re-R,R-F) [8, 10, 10, 8] deg
+H=1.30 S=4.024 v=[32.7, 38.62, 34.76, 90.09, 0.17] stereo full ring (0.5, 3.6) seams@2m(F-L,L-Re,Re-R,R-F) [12, 15, 15, 12] deg
+H=1.45 S=4.607 v=[30.16, 36.91, 37.72, 90.02, 0.19] stereo full ring (0.5, 4.2) seams@2m(F-L,L-Re,Re-R,R-F) [16, 18, 18, 16] deg
+H=1.60 S=4.999 v=[31.36, 39, 40.31, 90.18, 0.14] stereo full ring (0.5, 4.6) seams@2m(F-L,L-Re,Re-R,R-F) [19, 25, 25, 19] deg
+H=1.75 S=5.320 v=[32.61, 38.37, 39.27, 89.97, 0.17] stereo full ring (0.6, 5.2) seams@2m(F-L,L-Re,Re-R,R-F) [24, 28, 28, 24] deg
