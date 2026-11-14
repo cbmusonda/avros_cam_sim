@@ -51,7 +51,7 @@ function defaultCams() {
 }
 
 // Recommended 360° layout (see analysis/README.md): all four ZED X on a crown directly above the lidar,
-// optical centres 12 cm from the mast axis at 1.50 m. Full stereo ground ring from ~0.6 m to ~4.25 m off the body,
+// optical centres 12 cm from the mast axis at 1.50 m. Pitches (front 34, sides 40, rear 33) tuned for lane-line detection (analysis/lines.py); stereo ground ring ~0.6 to ~4 m,
 // 15-25° seam overlap at 2 m, crown sits above the Ouster's top beam (only the mast pole shadows the lidar).
 function crownCams() {
   const base = { roll: 0, range: 5, visible: true };
@@ -59,10 +59,10 @@ function crownCams() {
   const l4 = { lens: '4mm-calc', hfov: LENSES['4mm-calc'].h, vfov: LENSES['4mm-calc'].v };
   const H = 1.5, XM = OUSTER.c[0], RC = 0.12;
   return [
-    { id: 1, name: 'zed_front', color: COLORS[0], x: XM + RC, y: 0, z: H, yaw: 0, pitch: 30, ...l22, ...base },
-    { id: 2, name: 'zed_left', color: COLORS[1], x: XM, y: RC, z: H, yaw: 90, pitch: 37, ...l4, ...base },
-    { id: 3, name: 'zed_right', color: COLORS[2], x: XM, y: -RC, z: H, yaw: -90, pitch: 37, ...l4, ...base },
-    { id: 4, name: 'zed_rear', color: COLORS[3], x: XM - RC, y: 0, z: H, yaw: 180, pitch: 37, ...l22, ...base },
+    { id: 1, name: 'zed_front', color: COLORS[0], x: XM + RC, y: 0, z: H, yaw: 0, pitch: 34, ...l22, ...base },
+    { id: 2, name: 'zed_left', color: COLORS[1], x: XM, y: RC, z: H, yaw: 90, pitch: 40, ...l4, ...base },
+    { id: 3, name: 'zed_right', color: COLORS[2], x: XM, y: -RC, z: H, yaw: -90, pitch: 40, ...l4, ...base },
+    { id: 4, name: 'zed_rear', color: COLORS[3], x: XM - RC, y: 0, z: H, yaw: 180, pitch: 33, ...l22, ...base },
   ];
 }
 

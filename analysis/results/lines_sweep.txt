@@ -1,0 +1,34 @@
+# Lane-line detectability sweep (lines.py)
+
+## Sanity checks
+down-looking 2.2 mm h=0.5: model 111.76 px, f*w/h = 111.76 px (f=733)
+down-looking 2.2 mm h=1.0: model 55.88 px, f*w/h = 55.88 px (f=733)
+down-looking 2.2 mm h=1.5: model 37.25 px, f*w/h = 37.25 px (f=733)
+down-looking 4 mm h=0.5: model 203.20 px, f*w/h = 203.20 px (f=1333)
+down-looking 4 mm h=1.0: model 101.60 px, f*w/h = 101.60 px (f=1333)
+down-looking 4 mm h=1.5: model 67.73 px, f*w/h = 67.73 px (f=1333)
+level cam h=1, perpendicular line at x=4: model 3.493 px, analytic f*h*w/x^2 = 3.493 px
+level cam h=1, parallel line at x=4,y=1: model 9.878 px (lateral width ~ f*w/x = 13.970 px, reduced by obliquity)
+
+## Sweep (pitches optimised per height; preset row = committed 1.5 m 30/37/37)
+kind  H     pitch F/R/S[/yaw] Z1%   Z2%   Z3%   Z4%   ring(m)  ahd5 ahd3q perp   abeam px   graz  4m   4m⊥  8m    dash4  graz4 graz8  depthErr F 2/4/6m (cm) side 2/4m(cm) lidar%
+                                                                         (x,m)  (x,m) (x,m)                    ∥    ⊥    ∥     1m px
+crown 0.80  34/15/25           77    63    60    92  open       1.1   1.1   1.1   31.5(l)   29°   8.6  3.5  4.5     84  11.1°  5.8°  0.7-2 2.0-5 3.9-10     0.4-1 1.1-3     0.0
+crown 1.00  34/21/29          100    79    71    99  0.7-2.4    6.3   4.0   3.2   34.8(l)   35°   9.7  4.1  5.1     85  13.8°  7.2°  0.8-2 2.1-5 4.0-10     0.4-1 1.1-3     0.0
+crown 1.15  34/27/32          100    86    73    99  0.6-2.9    6.8   4.3   3.3   36.1(l)   39°  10.2  4.5  5.4     87  15.8°  8.3°  0.8-2 2.2-5 4.1-10     0.4-1 1.1-3     0.0
+crown 1.30  34/33/35          100    91    74   100  0.6-3.5    7.2   4.6   3.5   36.9(l)   42°  10.6  4.9  5.7     88  17.7°  9.3°  0.9-2 2.3-6 4.3-11     0.4-1 1.1-3     0.0
+crown 1.45  34/33/40          100    95    76   100  0.6-3.8    7.5   4.7   3.6   36.7(l)   45°  10.9  5.2  5.9     90  19.6° 10.4°  1.0-2 2.4-6 4.4-11     0.5-1 1.1-3     0.0
+crown 1.60  34/33/40          100    99    77   100  0.6-4.4    7.8   4.9   3.7   36.8(l)   48°  11.0  5.5  6.1     91  21.5° 11.4°  1.0-3 2.4-6 4.5-11     0.5-1 1.2-3     0.0
+crown 1.75  34/33/44          100   100    77   100  0.6-4.6    8.0   5.0   3.8   36.0(l)   51°  11.2  5.8  6.2     93  23.3° 12.4°  1.1-3 2.5-6 4.6-12     0.5-1 1.2-3     0.0
+body  0.45  34/27/26/71        65    46    66    80  open       4.0   2.8   2.8   31.7(l)   22°   6.5  2.8  3.1    109   7.1°  3.5°  0.4-1 1.5-4 3.1-8      0.2-1 0.8-2     0.0
+body  0.60  34/33/20/75        70    60    69    84  open       5.0   3.4   3.1   37.8(l)   28°   8.1  3.6  3.9    108   9.5°  4.6°  0.5-1 1.5-4 3.2-8      0.3-1 0.9-2     0.0
+body  0.70  34/39/22/79        75    67    66    87  open       5.5   3.7   3.3   40.5(l)   31°   9.0  4.0  4.3    107  11.0°  5.4°  0.5-1 1.6-4 3.3-8      0.3-1 1.0-2     0.0
+crown 1.50  30/37/37           91    91    75   100  0.6-4.2    7.2   4.6   3.6   37.3(l)   46°  10.6  5.2  5.7     89  20.3° 10.7°  1.0-2 2.5-6 4.6-12     0.5-1 1.2-3     0.0
+
+Columns: Z1 alongside lines (y=±0.9..3.0, x -1..2), Z2 ahead (y=±1.52, x 1..8), Z3 5-ft-radius curve lines,
+Z4 2-ft potholes 0.5-4 m. Line OK = stereo-valid AND >=5 px at 1920x1200 AND >=3 px at 960x600 (i.e. >=6 px full res).
+Pothole OK = stereo-valid centre and minor axis >=10 px. ring = full 360 stereo ground ring (m off footprint).
+ahd5 = farthest x ahead (contiguous) where both 10-ft-lane lines pass the line test; ahd3q = >=3 px at 640x400;
+perp = same for a line across the path (stop line / dash end). abeam px = best thickness of the lane line beside the robot (x=0.3)
+(F/L/R camera), graz = ray-to-ground angle there. 4m/8m = thickness of lane line at x=4/8; ⊥ = a crossing line at x=4.
+dash4 = length in px of a 1 m dash at x=4. depthErr = z^2*sd/(f*B), sd 0.1-0.25 px. lidar% = beams newly blocked by crown.
